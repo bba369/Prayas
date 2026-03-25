@@ -4,6 +4,9 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
+  --color-primary: #7D2E68;
+  --color-primary-dark: #632452;
+  --color-primary-light: #F9F2F7;
 }
 
 @layer base {
