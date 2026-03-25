@@ -10,6 +10,8 @@ import {
   Brain, 
   GraduationCap, 
   ArrowRight, 
+  ArrowLeft,
+  Baby,
   CheckCircle2, 
   XCircle, 
   Trophy, 
@@ -34,7 +36,7 @@ import {
   Clock
 } from 'lucide-react';
 import { analyzeLesson, chatWithAssistant } from './lib/gemini';
-import { LessonAnalysis, QuizLevel, Question, Course, Lesson, ChatMessage } from './types';
+import { LessonAnalysis, QuizLevel, Question, Course, Lesson, ChatMessage, GradeLevel } from './types';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
@@ -66,7 +68,11 @@ const MOCK_COURSES: Course[] = [
 ];
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'course' | 'lesson' | 'quiz' | 'results'>('dashboard');
+  const [view, setView] = useState<'login' | 'dashboard' | 'course' | 'lesson' | 'quiz' | 'results'>('login');
+  const [loginStep, setLoginStep] = useState<'name' | 'level' | 'grade'>('name');
+  const [gradeLevel, setGradeLevel] = useState<GradeLevel>('8-10');
+  const [selectedSpecificGrade, setSelectedSpecificGrade] = useState<string>('');
+  const [userName, setUserName] = useState('');
   const [step, setStep] = useState<'input' | 'analysis' | 'quiz' | 'results'>('input'); 
   const [textInput, setTextInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -133,7 +139,7 @@ export default function App() {
     if (!textInput.trim()) return;
     setIsAnalyzing(true);
     try {
-      const result = await analyzeLesson(textInput);
+      const result = await analyzeLesson(textInput, gradeLevel);
       setAnalysis(result);
       setStep('analysis');
       setView('lesson');
@@ -161,7 +167,7 @@ export default function App() {
     
     try {
       const context = analysis ? `Current Lesson: ${analysis.title}. Summary: ${analysis.summary}` : undefined;
-      const response = await chatWithAssistant(chatInput, chatMessages, context);
+      const response = await chatWithAssistant(chatInput, chatMessages, context, gradeLevel);
       
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -217,28 +223,273 @@ export default function App() {
   const NavItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active?: boolean, onClick: () => void }) => (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+      className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
+        gradeLevel === '1-4' ? 'rounded-full' : gradeLevel === '5-7' ? 'rounded-2xl' : gradeLevel === '11-12' ? 'rounded-none border-l-2 border-transparent' : 'rounded-xl'
+      } ${
         active 
-        ? 'bg-[#7D2E68] text-white shadow-lg shadow-[#7D2E68]/20' 
+        ? gradeLevel === '11-12' 
+          ? 'bg-transparent text-[#7D2E68] border-[#7D2E68] font-bold'
+          : 'bg-[#7D2E68] text-white shadow-lg shadow-[#7D2E68]/20' 
         : 'text-[#2D2D2D]/60 hover:bg-[#F9F2F7] hover:text-[#2D2D2D]'
       }`}
     >
-      <Icon size={20} />
-      <span className="font-medium">{label}</span>
+      <Icon size={gradeLevel === '1-4' ? 28 : gradeLevel === '5-7' ? 24 : 20} />
+      <span className={`${gradeLevel === '1-4' ? 'text-xl font-black' : gradeLevel === '5-7' ? 'text-lg font-bold' : 'font-medium'}`}>{label}</span>
     </button>
   );
 
+  const getThemeClasses = () => {
+    switch (gradeLevel) {
+      case '1-4':
+        return {
+          card: 'rounded-[60px] border-8 border-yellow-400/20 bg-white shadow-2xl',
+          button: 'rounded-full px-10 py-6 text-2xl font-black uppercase tracking-widest bg-orange-500 text-white',
+          heading: 'text-5xl font-black text-orange-600 tracking-tight',
+          text: 'text-2xl font-bold leading-relaxed text-blue-900',
+          accent: 'bg-orange-500 text-white',
+          container: 'gap-12'
+        };
+      case '5-7':
+        return {
+          card: 'rounded-[40px] border-4 border-[#7D2E68]/10 bg-white shadow-xl',
+          button: 'rounded-3xl px-8 py-5 text-lg font-black uppercase tracking-wider',
+          heading: 'text-4xl font-black text-[#7D2E68] tracking-tight',
+          text: 'text-xl font-medium leading-relaxed',
+          accent: 'bg-yellow-400 text-black',
+          container: 'gap-10'
+        };
+      case '11-12':
+        return {
+          card: 'rounded-none border-b border-[#2D2D2D]/10 bg-white',
+          button: 'rounded-none px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] border border-[#7D2E68]',
+          heading: 'text-5xl font-serif font-light text-[#2D2D2D] tracking-tighter',
+          text: 'text-base font-normal leading-loose font-serif',
+          accent: 'bg-[#2D2D2D] text-white',
+          container: 'gap-6'
+        };
+      default: // 8-10
+        return {
+          card: 'rounded-[32px] border border-[#2D2D2D]/5 bg-white shadow-sm',
+          button: 'rounded-2xl px-6 py-3 font-bold',
+          heading: 'text-3xl font-serif italic text-[#7D2E68]',
+          text: 'text-lg opacity-60',
+          accent: 'bg-[#7D2E68] text-white',
+          container: 'gap-8'
+        };
+    }
+  };
+
+  const theme = getThemeClasses();
+
+  const LEVELS = [
+    { id: '1-4', name: 'Foundation', grades: ['1', '2', '3', '4'], icon: Baby, desc: 'Fun & Visual English' },
+    { id: '5-7', name: 'Intermediate', grades: ['5', '6', '7'], icon: GraduationCap, desc: 'Building Blocks' },
+    { id: '8-10', name: 'Secondary', grades: ['8', '9', '10'], icon: BookOpen, desc: 'Advanced Grammar' },
+    { id: '11-12', name: 'Scholar', grades: ['11', '12'], icon: Library, desc: 'Critical Analysis' },
+  ];
+
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-[#FDFCF8] flex items-center justify-center p-6 font-sans">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white p-10 rounded-[40px] border border-[#2D2D2D]/5 shadow-2xl space-y-8 overflow-hidden relative"
+        >
+          {/* Progress Bar */}
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F9F2F7] flex">
+            <motion.div 
+              initial={{ width: "33%" }}
+              animate={{ 
+                width: loginStep === 'name' ? "33%" : loginStep === 'level' ? "66%" : "100%" 
+              }}
+              className="h-full bg-[#7D2E68] transition-all duration-500"
+            />
+          </div>
+
+          <AnimatePresence mode="wait">
+            {loginStep === 'name' && (
+              <motion.div 
+                key="name"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-8"
+              >
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 bg-[#7D2E68] rounded-3xl flex items-center justify-center text-white mx-auto mb-4 shadow-xl shadow-[#7D2E68]/20">
+                    <GraduationCap size={32} />
+                  </div>
+                  <h1 className="text-3xl font-serif italic text-[#7D2E68]">Hamro English Guru</h1>
+                  <p className="text-[#2D2D2D]/60">Your personalized English learning journey starts here.</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest opacity-40 px-1">Your Name</label>
+                    <input 
+                      type="text" 
+                      value={userName}
+                      onChange={(e) => setUserName(e.target.value)}
+                      placeholder="Enter your name"
+                      className="w-full px-6 py-4 bg-[#F9F2F7] rounded-2xl border-2 border-transparent focus:border-[#7D2E68]/20 focus:bg-white outline-none transition-all text-lg"
+                    />
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (userName.trim()) setLoginStep('level');
+                      else alert("Please enter your name.");
+                    }}
+                    className="w-full py-5 bg-[#7D2E68] text-white rounded-2xl font-bold text-lg shadow-xl shadow-[#7D2E68]/20 hover:bg-[#632452] transition-all flex items-center justify-center gap-2 group"
+                  >
+                    Next Step
+                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {loginStep === 'level' && (
+              <motion.div 
+                key="level"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setLoginStep('name')} className="p-2 hover:bg-[#F9F2F7] rounded-full text-[#7D2E68]">
+                    <ArrowLeft size={20} />
+                  </button>
+                  <div>
+                    <h2 className="text-xl font-bold">Choose your Level</h2>
+                    <p className="text-sm opacity-50">Select the best fit for your studies</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {LEVELS.map((level) => {
+                    const Icon = level.icon;
+                    const isActive = gradeLevel === level.id;
+                    return (
+                      <motion.button
+                        key={level.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setGradeLevel(level.id as GradeLevel);
+                        }}
+                        className={`p-4 rounded-3xl border-2 transition-all text-left flex items-center gap-4 relative overflow-hidden ${
+                          isActive 
+                          ? 'border-[#7D2E68] bg-[#7D2E68]/5' 
+                          : 'border-transparent bg-[#F9F2F7] hover:bg-[#F9F2F7]/80'
+                        }`}
+                      >
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isActive ? 'bg-[#7D2E68] text-white' : 'bg-white text-[#7D2E68]'}`}>
+                          <Icon size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-black text-[#7D2E68]">{level.name}</p>
+                          <p className="text-xs opacity-60 font-bold">{level.desc}</p>
+                        </div>
+                        {isActive && (
+                          <motion.div 
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="bg-[#7D2E68] text-white rounded-full p-1"
+                          >
+                            <CheckCircle2 size={16} />
+                          </motion.div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                <button 
+                  onClick={() => setLoginStep('grade')}
+                  className="w-full py-5 bg-[#7D2E68] text-white rounded-2xl font-bold text-lg shadow-xl shadow-[#7D2E68]/20 hover:bg-[#632452] transition-all flex items-center justify-center gap-2 group"
+                >
+                  Next Step
+                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </motion.div>
+            )}
+
+            {loginStep === 'grade' && (
+              <motion.div 
+                key="grade"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setLoginStep('level')} className="p-2 hover:bg-[#F9F2F7] rounded-full text-[#7D2E68]">
+                    <ArrowLeft size={20} />
+                  </button>
+                  <div>
+                    <h2 className="text-xl font-bold">Pick your Grade</h2>
+                    <p className="text-sm opacity-50">Select your specific class</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {LEVELS.find(l => l.id === gradeLevel)?.grades.map((g) => (
+                    <motion.button
+                      key={g}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedSpecificGrade(g)}
+                      className={`py-6 rounded-3xl font-black text-2xl transition-all border-2 relative overflow-hidden ${
+                        selectedSpecificGrade === g 
+                        ? 'bg-[#7D2E68] text-white border-[#7D2E68] shadow-lg shadow-[#7D2E68]/20' 
+                        : 'bg-[#F9F2F7] text-[#7D2E68] border-transparent hover:bg-[#7D2E68]/10'
+                      }`}
+                    >
+                      {g}
+                      {selectedSpecificGrade === g && (
+                        <motion.div 
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute top-2 right-2 text-white/50"
+                        >
+                          <CheckCircle2 size={16} />
+                        </motion.div>
+                      )}
+                    </motion.button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={() => {
+                    if (selectedSpecificGrade) setView('dashboard');
+                    else alert("Please select a grade.");
+                  }}
+                  className="w-full py-5 bg-[#7D2E68] text-white rounded-2xl font-bold text-lg shadow-xl shadow-[#7D2E68]/20 hover:bg-[#632452] transition-all"
+                >
+                  Start Learning
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#FDFCF8] text-[#2D2D2D] font-sans selection:bg-[#E6E6E6] flex">
+    <div className={`min-h-screen bg-[#FDFCF8] text-[#2D2D2D] selection:bg-[#E6E6E6] flex ${gradeLevel === '11-12' ? 'font-serif' : 'font-sans'}`}>
       {/* Sidebar - Desktop */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-[#2D2D2D]/5 transform transition-transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-6">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-[#7D2E68] rounded-xl flex items-center justify-center text-white">
+            <div className={`w-10 h-10 ${gradeLevel === '5-7' ? 'bg-yellow-400 text-black rounded-2xl' : 'bg-[#7D2E68] text-white rounded-xl'} flex items-center justify-center`}>
               <GraduationCap size={24} />
             </div>
             <div>
-              <h1 className="font-serif text-lg font-bold">Hamro Guru</h1>
+              <h1 className={`${gradeLevel === '11-12' ? 'font-serif' : 'font-sans'} text-lg font-bold`}>Hamro Guru</h1>
               <p className="text-[10px] uppercase tracking-widest opacity-40 font-bold">LMS Nepal</p>
             </div>
           </div>
@@ -250,14 +501,33 @@ export default function App() {
             <NavItem icon={Settings} label="Settings" active={false} onClick={() => {}} />
           </nav>
 
-          <div className="mt-auto p-4 bg-[#F9F2F7] rounded-2xl">
+          <div className="mt-6 space-y-2">
+            <p className="text-[10px] uppercase tracking-widest opacity-40 font-bold px-2">Switch Grade</p>
+            <div className="flex flex-col gap-1">
+              {(['1-4', '5-7', '8-10', '11-12'] as GradeLevel[]).map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setGradeLevel(g)}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                    gradeLevel === g 
+                    ? 'bg-[#7D2E68] text-white' 
+                    : 'bg-[#F9F2F7] text-[#7D2E68] hover:bg-[#7D2E68]/10'
+                  }`}
+                >
+                  Grade {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={`mt-auto p-4 ${gradeLevel === '11-12' ? 'bg-white border-t border-[#2D2D2D]/10' : 'bg-[#F9F2F7] rounded-2xl'}`}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-[#7D2E68]/10 flex items-center justify-center text-[#7D2E68]">
                 <User size={20} />
               </div>
               <div>
-                <p className="text-sm font-bold">Pasang Lama</p>
-                <p className="text-[10px] opacity-50">Grade 10 Student</p>
+                <p className="text-sm font-bold">{userName || 'Student'}</p>
+                <p className="text-[10px] opacity-50">Grade {selectedSpecificGrade || gradeLevel} Student</p>
               </div>
             </div>
             <div className="h-1.5 w-full bg-white rounded-full overflow-hidden">
@@ -308,60 +578,60 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-10"
               >
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className={`flex flex-col md:flex-row md:items-end justify-between ${theme.container}`}>
                   <div>
-                    <h2 className="text-3xl font-serif italic text-[#7D2E68]">Namaste, Pasang!</h2>
-                    <p className="text-[#2D2D2D]/60 mt-1">Ready to weave some more knowledge today?</p>
+                    <h2 className={theme.heading}>Namaste, {userName || 'Student'}!</h2>
+                    <p className={`${theme.text} mt-1`}>Ready to weave some more knowledge today?</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf" className="hidden" />
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-6 py-3 bg-[#7D2E68] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#632452] transition-all shadow-lg shadow-[#7D2E68]/20"
+                      className={`${theme.button} ${gradeLevel === '5-7' ? 'bg-yellow-400 text-black' : 'bg-[#7D2E68] text-white'} flex items-center gap-2 hover:opacity-90 transition-all shadow-lg`}
                     >
-                      <FileUp size={18} />
+                      <FileUp size={gradeLevel === '5-7' ? 24 : 18} />
                       Quick Upload PDF
                     </button>
                   </div>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${theme.container}`}>
                   {[
                     { label: 'Lessons Done', value: '12', icon: BookOpen, color: 'bg-blue-50 text-blue-600' },
                     { label: 'Quiz Avg', value: '84%', icon: Trophy, color: 'bg-yellow-50 text-yellow-600' },
                     { label: 'Study Time', value: '14h', icon: Clock, color: 'bg-purple-50 text-purple-600' },
                     { label: 'Streak', value: '5 Days', icon: Sparkles, color: 'bg-orange-50 text-orange-600' },
                   ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-3xl border border-[#2D2D2D]/5 shadow-sm">
-                      <div className={`w-12 h-12 ${stat.color} rounded-2xl flex items-center justify-center mb-4`}>
+                    <div key={i} className={theme.card + " p-6"}>
+                      <div className={`w-12 h-12 ${stat.color} ${gradeLevel === '5-7' ? 'rounded-full' : 'rounded-2xl'} flex items-center justify-center mb-4`}>
                         <stat.icon size={24} />
                       </div>
-                      <p className="text-2xl font-bold">{stat.value}</p>
+                      <p className={`${gradeLevel === '5-7' ? 'text-3xl' : 'text-2xl'} font-bold`}>{stat.value}</p>
                       <p className="text-xs font-bold uppercase tracking-widest opacity-40">{stat.label}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* Courses Section */}
-                <div className="space-y-6">
+                <div className={theme.container}>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-serif italic">Continue Learning</h3>
+                    <h3 className={theme.heading.replace('text-4xl', 'text-2xl').replace('text-5xl', 'text-3xl')}>Continue Learning</h3>
                     <button className="text-sm font-bold text-[#7D2E68] hover:underline">View All</button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className={`grid grid-cols-1 md:grid-cols-2 ${theme.container}`}>
                     {MOCK_COURSES.map(course => (
                       <div 
                         key={course.id} 
                         onClick={() => { setActiveCourse(course); setView('course'); }}
-                        className="group bg-white rounded-[32px] overflow-hidden border border-[#2D2D2D]/5 shadow-sm hover:shadow-xl transition-all cursor-pointer"
+                        className={`group overflow-hidden transition-all cursor-pointer ${theme.card}`}
                       >
-                        <div className="h-48 overflow-hidden relative">
+                        <div className={`${gradeLevel === '11-12' ? 'h-32' : 'h-48'} overflow-hidden relative`}>
                           <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
+                          <div className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6`}>
                             <div className="text-white">
                               <p className="text-xs font-bold uppercase tracking-widest opacity-80">Course</p>
-                              <h4 className="text-xl font-bold">{course.title}</h4>
+                              <h4 className={`${gradeLevel === '5-7' ? 'text-2xl' : 'text-xl'} font-bold`}>{course.title}</h4>
                             </div>
                           </div>
                         </div>
@@ -385,28 +655,28 @@ export default function App() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
+                className={theme.container}
               >
-                <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-sm font-bold text-[#7D2E68] hover:opacity-70">
+                <button onClick={() => setView('dashboard')} className={`flex items-center gap-2 text-sm font-bold text-[#7D2E68] hover:opacity-70 ${gradeLevel === '11-12' ? 'uppercase tracking-widest' : ''}`}>
                   <ArrowRight className="rotate-180" size={18} />
                   Back to Dashboard
                 </button>
 
-                <div className="bg-white p-8 rounded-[40px] border border-[#2D2D2D]/5 shadow-sm flex flex-col md:flex-row gap-8 items-center">
-                  <img src={activeCourse.thumbnail} className="w-48 h-48 rounded-3xl object-cover" />
+                <div className={`${theme.card} p-8 flex flex-col md:flex-row gap-8 items-center`}>
+                  <img src={activeCourse.thumbnail} className={`w-48 h-48 object-cover ${gradeLevel === '5-7' ? 'rounded-full' : 'rounded-3xl'}`} />
                   <div className="flex-1 text-center md:text-left">
-                    <h2 className="text-4xl font-serif italic text-[#7D2E68]">{activeCourse.title}</h2>
-                    <p className="text-lg opacity-60 mt-2">{activeCourse.description}</p>
+                    <h2 className={theme.heading}>{activeCourse.title}</h2>
+                    <p className={theme.text + " mt-2"}>{activeCourse.description}</p>
                     <div className="mt-6 flex flex-wrap gap-4 justify-center md:justify-start">
-                      <div className="px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest">12 Lessons</div>
-                      <div className="px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest">8 Quizzes</div>
-                      <div className="px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest">Certificate</div>
+                      <div className={`px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest`}>12 Lessons</div>
+                      <div className={`px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest`}>8 Quizzes</div>
+                      <div className={`px-4 py-2 bg-[#F9F2F7] rounded-xl text-xs font-bold uppercase tracking-widest`}>Certificate</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-xl font-serif italic px-2">Course Curriculum</h3>
+                <div className={theme.container}>
+                  <h3 className={`${theme.heading.replace('text-4xl', 'text-2xl').replace('text-5xl', 'text-3xl')} px-2`}>Course Curriculum</h3>
                   <div className="space-y-3">
                     {activeCourse.lessons.map((lesson, i) => (
                       <div 
@@ -418,15 +688,15 @@ export default function App() {
                             setStep('input');
                           }
                         }}
-                        className={`p-6 rounded-3xl border flex items-center justify-between transition-all ${
+                        className={`p-6 flex items-center justify-between transition-all ${theme.card} ${
                           lesson.status === 'locked' 
-                          ? 'bg-[#F9F2F7]/50 border-transparent opacity-50 cursor-not-allowed' 
-                          : 'bg-white border-[#2D2D2D]/5 shadow-sm hover:shadow-md cursor-pointer'
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : 'hover:shadow-md cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                            lesson.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-[#7D2E68]/5 text-[#7D2E68]'
+                          <div className={`w-10 h-10 flex items-center justify-center font-bold ${
+                            lesson.status === 'completed' ? 'bg-green-100 text-green-600 rounded-full' : gradeLevel === '5-7' ? 'bg-yellow-400 text-black rounded-full' : 'bg-[#7D2E68]/5 text-[#7D2E68] rounded-xl'
                           }`}>
                             {lesson.status === 'completed' ? <CheckCircle2 size={20} /> : i + 1}
                           </div>
@@ -477,13 +747,13 @@ export default function App() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="space-y-8"
+                      className={theme.container}
                     >
                       <div className="space-y-4 text-center">
-                        <h2 className="text-4xl font-serif italic text-[#7D2E68]">
-                          {activeLesson ? activeLesson.title : 'Namaste, Student!'}
+                        <h2 className={theme.heading}>
+                          {activeLesson ? activeLesson.title : `Namaste, ${userName || 'Student'}!`}
                         </h2>
-                        <p className="text-lg opacity-70 max-w-xl mx-auto">Paste your textbook content or upload a PDF to start weaving knowledge.</p>
+                        <p className={theme.text + " max-w-xl mx-auto"}>Paste your textbook content or upload a PDF to start weaving knowledge.</p>
                       </div>
 
                       <div className="relative group">
@@ -491,7 +761,7 @@ export default function App() {
                           value={textInput}
                           onChange={(e) => setTextInput(e.target.value)}
                           placeholder="Example: Once upon a time in Pokhara, there lived a brave girl named Shanti..."
-                          className="w-full h-64 p-8 bg-white border-2 border-[#2D2D2D]/10 rounded-[40px] shadow-sm focus:border-[#7D2E68] focus:ring-0 transition-all text-lg resize-none"
+                          className={`w-full h-64 p-8 bg-white border-2 border-[#2D2D2D]/10 ${gradeLevel === '5-7' ? 'rounded-[40px]' : gradeLevel === '11-12' ? 'rounded-none' : 'rounded-[32px]'} shadow-sm focus:border-[#7D2E68] focus:ring-0 transition-all text-lg resize-none`}
                         />
                         
                         <div className="absolute bottom-6 left-6 flex items-center gap-3">
@@ -499,7 +769,7 @@ export default function App() {
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isExtracting || isAnalyzing}
-                            className="bg-white border-2 border-[#7D2E68]/20 text-[#7D2E68] px-6 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-[#F9F2F7] disabled:opacity-50 transition-all shadow-sm"
+                            className={`bg-white border-2 border-[#7D2E68]/20 text-[#7D2E68] px-6 py-4 ${gradeLevel === '5-7' ? 'rounded-full' : 'rounded-2xl'} font-bold flex items-center gap-3 hover:bg-[#F9F2F7] disabled:opacity-50 transition-all shadow-sm`}
                           >
                             {isExtracting ? <Loader2 className="animate-spin" size={20} /> : <FileUp size={20} />}
                             {isExtracting ? 'Extracting...' : 'Upload PDF'}
@@ -510,7 +780,7 @@ export default function App() {
                           <button
                             onClick={handleAnalyze}
                             disabled={isAnalyzing || isExtracting || !textInput.trim()}
-                            className="bg-[#7D2E68] text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-[#632452] disabled:opacity-50 transition-all shadow-lg shadow-[#7D2E68]/20"
+                            className={`${gradeLevel === '5-7' ? 'bg-yellow-400 text-black rounded-full' : 'bg-[#7D2E68] text-white rounded-2xl'} px-8 py-4 font-bold flex items-center gap-3 hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-[#7D2E68]/20`}
                           >
                             {isAnalyzing ? <RefreshCcw className="animate-spin" size={20} /> : <Sparkles size={20} />}
                             {isAnalyzing ? 'Analyzing...' : 'Weave Knowledge'}
@@ -525,49 +795,49 @@ export default function App() {
                       key="analysis"
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="space-y-10"
+                      className={theme.container}
                     >
                       <div className="text-center space-y-2">
-                        <h2 className="text-4xl font-serif italic text-[#7D2E68]">{analysis.title}</h2>
+                        <h2 className={theme.heading}>{analysis.title}</h2>
                         <p className="text-xs uppercase tracking-[0.3em] font-bold opacity-40">Lesson Analysis</p>
                       </div>
 
-                      <section className="bg-white p-10 rounded-[40px] border border-[#2D2D2D]/5 shadow-sm space-y-6">
+                      <section className={`${theme.card} p-10 space-y-6`}>
                         <div className="flex items-center gap-3 text-[#7D2E68]">
                           <BookOpen size={24} />
-                          <h3 className="font-serif text-2xl italic">Summary</h3>
+                          <h3 className={`${theme.heading.replace('text-4xl', 'text-2xl').replace('text-5xl', 'text-3xl')} italic`}>Summary</h3>
                         </div>
-                        <p className="text-xl leading-relaxed opacity-80">{analysis.summary}</p>
+                        <p className={theme.text}>{analysis.summary}</p>
                       </section>
 
-                      <div className="grid md:grid-cols-2 gap-8">
-                        <section className="bg-white p-8 rounded-[40px] border border-[#2D2D2D]/5 shadow-sm space-y-6">
+                      <div className={`grid md:grid-cols-2 ${theme.container}`}>
+                        <section className={`${theme.card} p-8 space-y-6`}>
                           <div className="flex items-center gap-3 text-[#7D2E68]">
                             <Languages size={22} />
-                            <h3 className="font-serif text-xl italic">Vocabulary</h3>
+                            <h3 className={`${theme.heading.replace('text-4xl', 'text-xl').replace('text-5xl', 'text-2xl')} italic`}>Vocabulary</h3>
                           </div>
                           <div className="space-y-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                             {analysis.vocabulary.map((item, idx) => (
-                              <div key={idx} className="p-4 rounded-2xl bg-[#F9F2F7]/50 border border-transparent hover:border-[#7D2E68]/10 transition-all">
+                              <div key={idx} className={`p-4 ${gradeLevel === '5-7' ? 'rounded-3xl' : 'rounded-2xl'} bg-[#F9F2F7]/50 border border-transparent hover:border-[#7D2E68]/10 transition-all`}>
                                 <p className="font-bold text-lg text-[#7D2E68]">{item.word}</p>
                                 <p className="text-sm opacity-60 italic">{item.english_meaning}</p>
-                                <p className="text-sm font-medium text-[#7D2E68]/80 mt-1">{item.nepali_meaning}</p>
+                                <p className="text-sm font-bold text-[#7D2E68]/80 mt-1">{item.nepali_meaning}</p>
                               </div>
                             ))}
                           </div>
                         </section>
 
-                        <section className="bg-white p-8 rounded-[40px] border border-[#2D2D2D]/5 shadow-sm flex flex-col">
+                        <section className={`${theme.card} p-8 flex flex-col`}>
                           <div className="flex items-center gap-3 text-[#7D2E68] mb-6">
                             <Brain size={22} />
-                            <h3 className="font-serif text-xl italic">Grammar Focus</h3>
+                            <h3 className={`${theme.heading.replace('text-4xl', 'text-xl').replace('text-5xl', 'text-2xl')} italic`}>Grammar Focus</h3>
                           </div>
-                          <div className="p-6 bg-[#F9F2F7] rounded-3xl border border-[#7D2E68]/10 flex-1">
-                            <p className="text-lg leading-relaxed opacity-80">{analysis.grammar_tips}</p>
+                          <div className={`p-6 bg-[#F9F2F7] ${gradeLevel === '5-7' ? 'rounded-[32px]' : 'rounded-3xl'} border border-[#7D2E68]/10 flex-1`}>
+                            <p className={theme.text}>{analysis.grammar_tips}</p>
                           </div>
                           <button 
                             onClick={() => startQuiz(1)}
-                            className="w-full mt-8 bg-[#7D2E68] text-white p-5 rounded-2xl font-bold flex items-center justify-between hover:bg-[#632452] transition-all shadow-lg shadow-[#7D2E68]/20"
+                            className={`w-full mt-8 ${theme.button} ${gradeLevel === '5-7' ? 'bg-yellow-400 text-black' : 'bg-[#7D2E68] text-white'} flex items-center justify-between hover:opacity-90 transition-all shadow-lg`}
                           >
                             Start Adaptive Quiz
                             <ChevronRight size={20} />

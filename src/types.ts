@@ -26,6 +26,7 @@ export interface LessonAnalysis {
 }
 
 export type QuizLevel = 1 | 2 | 3;
+export type GradeLevel = '1-4' | '5-7' | '8-10' | '11-12';
 
 export interface Course {
   id: string;

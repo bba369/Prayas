@@ -1,15 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { LessonAnalysis, ChatMessage } from "../types";
+import { LessonAnalysis, ChatMessage, GradeLevel } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-export async function analyzeLesson(textbookContent: string): Promise<LessonAnalysis> {
+export async function analyzeLesson(textbookContent: string, gradeLevel: GradeLevel): Promise<LessonAnalysis> {
   const response = await ai.models.generateContent({
     model: "gemini-3.1-pro-preview",
     contents: [
       {
-        text: `You are an expert English Language Tutor for students in grades 8-12 in rural Nepal. Your goal is to act as the core engine for an Adaptive LMS.
+        text: `You are an expert English Language Tutor for students in Grade ${gradeLevel} in rural Nepal. Your goal is to act as the core engine for an Adaptive LMS.
         
+        Adapt your complexity and tone:
+        - Grade 1-4: Use extremely simple English, focus on basic nouns, verbs, and visual descriptions. Be very playful and use lots of emojis.
+        - Grade 5-7: Use very simple English, focus on basic vocabulary and direct facts.
+        - Grade 8-10: Use moderate complexity, focus on sentence structure and literary devices.
+        - Grade 11-12: Use academic language, focus on critical analysis, advanced rhetoric, and complex themes.
+
         Input: ${textbookContent}
         
         Task 1: Content Analysis (The Knowledge Weaver)
@@ -116,13 +122,21 @@ export async function analyzeLesson(textbookContent: string): Promise<LessonAnal
 export async function chatWithAssistant(
   message: string,
   history: ChatMessage[],
-  lessonContext?: string
+  lessonContext?: string,
+  gradeLevel: GradeLevel = '8-10'
 ): Promise<string> {
   const chat = ai.chats.create({
     model: "gemini-3.1-flash-lite-preview",
     config: {
-      systemInstruction: `You are "The Knowledge Weaver", a friendly and encouraging AI tutor for students in rural Nepal. 
+      systemInstruction: `You are "The Knowledge Weaver", a friendly and encouraging AI tutor for students in Grade ${gradeLevel} in rural Nepal. 
       Your goal is to help them understand their English lessons. 
+      
+      Adapt your tone:
+      - Grade 1-4: Be extremely playful, use many emojis, very simple words, and tell short, fun stories.
+      - Grade 5-7: Be very encouraging, use emojis, simple explanations, and fun examples.
+      - Grade 8-10: Be helpful and clear, use relatable examples, focus on academic growth.
+      - Grade 11-12: Be professional, academic, and intellectually stimulating. Use precise terminology.
+
       Use simple English, and occasionally use Nepali words to make them feel comfortable.
       If a lesson context is provided, focus your answers on that lesson.
       Context: ${lessonContext || "No specific lesson context provided yet."}`,
