@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { LessonAnalysis } from "../types";
+import { LessonAnalysis, ChatMessage } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -13,6 +13,7 @@ export async function analyzeLesson(textbookContent: string): Promise<LessonAnal
         Input: ${textbookContent}
         
         Task 1: Content Analysis (The Knowledge Weaver)
+        - Provide a catchy title for the lesson.
         - Extract key vocabulary words with their meanings in both English and Simple Nepali.
         - Identify the primary Grammar focus (e.g., Tense, Reported Speech, Passive Voice).
         - Create a 3-sentence simple summary of the lesson.
@@ -28,7 +29,7 @@ export async function analyzeLesson(textbookContent: string): Promise<LessonAnal
         - Use local Nepali contexts (names like Shanti, Pasang; places like Pokhara, Namche) in example sentences to make it relatable.
         
         Output Format:
-        Return the response in JSON format. Structure: { "summary": "", "vocabulary": [], "grammar_tips": "", "questions": { "level_1": [], "level_2": [], "level_3": [] } }
+        Return the response in JSON format. Structure: { "title": "", "summary": "", "vocabulary": [], "grammar_tips": "", "questions": { "level_1": [], "level_2": [], "level_3": [] } }
         
         Ensure the 'questions' objects follow this structure:
         { "id": "unique_id", "type": "mcq" | "true_false" | "short_answer" | "transformation", "question": "", "options": ["A", "B", "C", "D"] (for mcq), "correct_answer": "", "explanation": "" }`
@@ -39,6 +40,7 @@ export async function analyzeLesson(textbookContent: string): Promise<LessonAnal
       responseSchema: {
         type: Type.OBJECT,
         properties: {
+          title: { type: Type.STRING },
           summary: { type: Type.STRING },
           vocabulary: {
             type: Type.ARRAY,
@@ -103,10 +105,30 @@ export async function analyzeLesson(textbookContent: string): Promise<LessonAnal
             required: ["level_1", "level_2", "level_3"]
           }
         },
-        required: ["summary", "vocabulary", "grammar_tips", "questions"]
+        required: ["title", "summary", "vocabulary", "grammar_tips", "questions"]
       }
     }
   });
 
   return JSON.parse(response.text);
+}
+
+export async function chatWithAssistant(
+  message: string,
+  history: ChatMessage[],
+  lessonContext?: string
+): Promise<string> {
+  const chat = ai.chats.create({
+    model: "gemini-3.1-flash-lite-preview",
+    config: {
+      systemInstruction: `You are "The Knowledge Weaver", a friendly and encouraging AI tutor for students in rural Nepal. 
+      Your goal is to help them understand their English lessons. 
+      Use simple English, and occasionally use Nepali words to make them feel comfortable.
+      If a lesson context is provided, focus your answers on that lesson.
+      Context: ${lessonContext || "No specific lesson context provided yet."}`,
+    },
+  });
+
+  const response = await chat.sendMessage({ message });
+  return response.text || "I'm sorry, I couldn't process that.";
 }
